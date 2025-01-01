@@ -14,15 +14,12 @@ import (
 	"golang.org/x/net/ipv6"
 )
 
-type ip_version int
-
-func DummyPing(addr string) (string, error) {
-	if time.Now().Unix() % 15 == 0 {
-		return "", errors.New(fmt.Sprintf("failed to get reply from %v", addr))
-	}
-
-	return fmt.Sprintf("received reply from %+s", addr),  nil
-}
+var (
+	network string
+	l_addr string
+	recv_proto int
+	icmp_type icmp.Type
+)
 
 func lookupAddress(s string) ([]net.IP, error) {
 	result, err := net.LookupIP(s)
@@ -33,6 +30,7 @@ func lookupAddress(s string) ([]net.IP, error) {
 	return result, nil
 }
 
+type ip_version int
 func determineAddressFamily(s string) (ip_version) {
 	addr := net.ParseIP(s)
 
@@ -55,11 +53,6 @@ func Ping(addr string) (string, error) {
 			return "", errors.New("Unsupported Operating system")
 	}
 
-	var network string
-	var l_addr string
-	var recv_proto int
-	var icmp_type icmp.Type
-
 	switch {
 		case determineAddressFamily(addr) == 4:
 			network, l_addr, recv_proto, icmp_type = "udp4", "0.0.0.0", 1, ipv4.ICMPTypeEcho
@@ -79,7 +72,7 @@ func Ping(addr string) (string, error) {
 				network, l_addr, recv_proto, icmp_type = "udp6", "::", 58, ipv6.ICMPTypeEchoRequest
 			}
 
-			// Keeping it here just in case
+			// Keeping it here just in case...
 			slog.Debug(
 				fmt.Sprintf("default mapping performend on %v", addr),
 				slog.String("network", network),
@@ -127,9 +120,10 @@ func Ping(addr string) (string, error) {
 		return "", errors.New(fmt.Sprintf("Reading from conn: %+v", err))
 	}
 
+	// recv_proto:
 	// icmpv4 proto number -> 0x01 -> 1
 	// icmpv6 proto number -> 0x3a -> 58
-	//rm, err := icmp.ParseMessage(58, rb[:n])
+	// e.q: rm, err := icmp.ParseMessage(58, rb[:n])
 	rm, err := icmp.ParseMessage(recv_proto, rb[:n])
 	if err != nil {
 		return "", errors.New(fmt.Sprintf("parsing message: %+v", err))
@@ -137,9 +131,9 @@ func Ping(addr string) (string, error) {
 
 	switch rm.Type {
 		case ipv4.ICMPTypeEchoReply:
-			return fmt.Sprintf("Reply %v - Type: %d - Checksum: %d - Raw: %v ", peer, rm.Type, rm.Checksum, rm), nil
+			return fmt.Sprintf("Reply %v - Type: %d - Checksum: %d - Message: %v ", peer, rm.Type, rm.Checksum, rm), nil
 		case ipv6.ICMPTypeEchoReply:
-			return fmt.Sprintf("Reply %v - Type: %d - Checksum: %d - Raw: %v ", peer, rm.Type, rm.Checksum, rm), nil
+			return fmt.Sprintf("Reply %v - Type: %d - Checksum: %d - Message: %v ", peer, rm.Type, rm.Checksum, rm), nil
 		default:
 			return fmt.Sprintf("Non-Reply: %v - Type: %d - Checksum: %d - Raw: %v", peer, rm.Type, rm.Checksum, rm), nil
 	}
