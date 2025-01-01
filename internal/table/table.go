@@ -136,14 +136,16 @@ func MakeTable(records []string) model {
 			var style = baseStyle
 
 			switch {
+				case col == 0 && row == -1:
+					style = headerStyle
 				case col == 1 && row == -1:
-					style = headerStyle.Width(5)
+					style = headerStyle
 				case col == 2 && row == -1:
-					style = headerStyle.Width(5)
+					style = headerStyle
 				case col == 3 && row == -1:
-					style = headerStyle.Width(5)
+					style = headerStyle
 				case col == 4 && row == -1:
-					style = headerStyle.Width(1).AlignHorizontal(lipgloss.Center)
+					style = headerStyle.Width(5).AlignHorizontal(lipgloss.Center)
 				case col == 5 && row == -1:
 					style = headerStyle.Width(200)
 				case col == 4:
