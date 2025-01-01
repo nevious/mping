@@ -1,4 +1,4 @@
-module github.com/nevious/goping
+module github.com/nevious/mping
 
 go 1.23.2
 

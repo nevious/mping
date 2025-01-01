@@ -9,7 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
 
-	"github.com/nevious/goping/internal/pinger"
+	"github.com/nevious/mping/internal/pinger"
 )
 
 var (

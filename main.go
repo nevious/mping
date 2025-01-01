@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 	"log/slog"
-	"github.com/nevious/goping/internal/table"
-	"github.com/nevious/goping/internal/parser"
+	"github.com/nevious/mping/internal/table"
+	"github.com/nevious/mping/internal/parser"
 )
 
 func main() {
