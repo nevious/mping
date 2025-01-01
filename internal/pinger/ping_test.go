@@ -59,13 +59,17 @@ type string_input struct {
 var lookup_addresses = []string_input {
 	string_input{"example.com", net.ParseIP("2606:2800:21f:cb07:6820:80da:af6b:8b2c")},
 	string_input{"nevious.ch", net.ParseIP("75.2.60.5")},
+	string_input{"nevious_.ch", nil},
 }
 
 func TestLookupAddress(t *testing.T) {
 	for _, test := range lookup_addresses {
 		result, err := lookupAddress(test.addr)
-		if err != nil {
-			t.Errorf("threw error, unexpected: %+v\n", err)
+		if err != nil && test.exp != nil {
+			t.Errorf("%v threw error, unexpected: %+v\n", test.addr, err)
+		} else if err != nil && test.exp == nil {
+			t.Logf("%v expected: %v\n", test.addr, err)
+			return
 		}
 
 		for _, element := range result {

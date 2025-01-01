@@ -61,10 +61,10 @@ func Ping(addr string) (string, error) {
 		default:
 			// most likely a hostname.. let's first try to look it up and then figure out the rest
 			addr_slice, err := lookupAddress(addr)
-			new_addr := addr_slice[0].String()
-			if err != err {
-				return "", errors.New(fmt.Sprintf("error while looking up %v: %v", addr, err))
+			if err != nil {
+				return "", errors.New(fmt.Sprintf("lookup error %v: %v", addr, err))
 			}
+			new_addr := addr_slice[0].String()
 
 			if determineAddressFamily(new_addr) == 4 {
 				network, l_addr, recv_proto, icmp_type = "udp4", "0.0.0.0", 1, ipv4.ICMPTypeEcho
