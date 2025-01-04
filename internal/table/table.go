@@ -20,19 +20,20 @@ var (
 	headerStyle = baseStyle.Bold(true).Width(5)
 )
 
-// General model for bubbletea to interact with
-type model struct {
+// General rootModel for bubbletea to interact with
+type rootModel struct {
 	table *table.Table
 	records []dataRecord
 }
 
 // Model for a single row within the table.
-// added to bubbletea model via records-array
+// added to bubbletea rootModel via records-array
 type dataRecord struct {
 	Address string
 	Sent int
 	Failures int
 	Loss float64
+	PingReturn pinger.IcmpReply
 	LastMessage string
 	FailState lipgloss.Style
 }
@@ -45,13 +46,13 @@ func tick() tea.Cmd {
 	})
 }
 
-// initialize the model with a tick
-func (m model) Init() tea.Cmd {
+// initialize the rootModel with a tick
+func (m rootModel) Init() tea.Cmd {
 	return tick()
 }
 
 // any sort of event shoudl trigger this method
-func(m model) Update(msg tea.Msg) (tea.Model, tea.Cmd){
+func(m rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd){
 	switch msg := msg.(type) {
 		case tickMsg:
 			return m.updateRecords(), tick()
@@ -67,13 +68,13 @@ func(m model) Update(msg tea.Msg) (tea.Model, tea.Cmd){
 	return m, nil
 }
 
-func(m model) View() string {
+func(m rootModel) View() string {
 	return m.table.String()
 }
 
 // triggered by Update() if the tick ran out
 // replace rows with new values
-func (m model) updateRecords() model {
+func (m rootModel) updateRecords() rootModel {
 	var rows [][]string
 
 	for index, element := range m.records {
@@ -90,11 +91,16 @@ func (m model) updateRecords() model {
 func (d dataRecord) refresh() dataRecord {
 	answer, err := pinger.Ping(d.Address)
 	if err != nil {
+		d.PingReturn = *answer
 		d.LastMessage = fmt.Sprintf("%+v", err)
 		d.Failures = d.Failures + 1
 		d.FailState = d.FailState.Foreground(lipgloss.Color("#F18C8E"))
 	} else {
-		d.LastMessage = answer
+		d.PingReturn = *answer
+		d.LastMessage = fmt.Sprintf(
+			"Peer: %v - Checksum: %d - Proto: %d - Duration: %v",
+			answer.Peer, answer.Checksum, answer.IcmpProto, answer.Duration,
+		)
 		d.FailState = d.FailState.Foreground(lipgloss.Color("#4CAEA3"))
 	}
 
@@ -118,13 +124,13 @@ func (d dataRecord) render() []string {
 func makeTableRows(addrs []string) []dataRecord {
 	var result []dataRecord
 	for _, element := range addrs {
-		result = append(result, dataRecord{element, 0, 0.0, 0, "-", lipgloss.NewStyle()})
+		result = append(result, dataRecord{element, 0, 0.0, 0, pinger.IcmpReply{}, "-", lipgloss.NewStyle()})
 	}
 
 	return result
 }
 
-func MakeTable(records []string) model {
+func MakeTable(records []string) rootModel {
 	rows := makeTableRows(records)
 	s := table.New().Border(
 			lipgloss.NormalBorder(),
@@ -155,10 +161,10 @@ func MakeTable(records []string) model {
 			return style
 		}).BorderTop(false).BorderBottom(false).BorderLeft(false).BorderRight(false).BorderColumn(false)
 
-	return model{s, rows}
+	return rootModel{s, rows}
 }
 
-func LaunchTablePing(m model) (tea.Model, error) {
+func LaunchTablePing(m rootModel) (tea.Model, error) {
 	if programm, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
 		return nil, err
 	} else {

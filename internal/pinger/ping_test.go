@@ -47,7 +47,7 @@ func TestPingDestination(t *testing.T) {
 			t.Errorf("threw error, unexpected: %+v", err)
 		}
 
-		fmt.Printf("Pinging result: %v\n", result)
+		fmt.Printf("Pinging result: %+v\n", result)
 	}
 }
 

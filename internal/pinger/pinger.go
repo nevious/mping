@@ -21,6 +21,15 @@ var (
 	icmp_type icmp.Type
 )
 
+type IcmpReply struct {
+	Peer net.Addr
+	Type icmp.Type
+	Checksum int
+	Body icmp.MessageBody
+	IcmpProto int
+	Duration time.Duration
+}
+
 func lookupAddress(s string) ([]net.IP, error) {
 	result, err := net.LookupIP(s)
 	if err != nil {
@@ -44,13 +53,13 @@ func determineAddressFamily(s string) (ip_version) {
 	}
 }
 
-func Ping(addr string) (string, error) {
+func Ping(addr string) (*IcmpReply, error) {
 	switch runtime.GOOS {
 		case "darwin", "ios":
 		case "linux":
 			slog.Debug("you may need to adjust the net.ipv4.ping_group_range kernel state")
 		default:
-			return "", errors.New("Unsupported Operating system")
+			return &IcmpReply{}, errors.New("Unsupported Operating system")
 	}
 
 	switch {
@@ -62,7 +71,7 @@ func Ping(addr string) (string, error) {
 			// most likely a hostname.. let's first try to look it up and then figure out the rest
 			addr_slice, err := lookupAddress(addr)
 			if err != nil {
-				return "", errors.New(fmt.Sprintf("lookup error %v: %v", addr, err))
+				return &IcmpReply{}, errors.New(fmt.Sprintf("lookup error %v: %v", addr, err))
 			}
 			new_addr := addr_slice[0].String()
 
@@ -88,37 +97,40 @@ func Ping(addr string) (string, error) {
 
 	conn, err := icmp.ListenPacket(network, l_addr)
 	if err != nil {
-		return "", errors.New(fmt.Sprintf("icmp.ListenPacket: %+v", err))
+		return &IcmpReply{}, errors.New(fmt.Sprintf("icmp.ListenPacket: %+v", err))
 	}
 	defer conn.Close()
 
 	err = conn.SetDeadline(time.Now().Add(time.Millisecond*500))
 	if err != nil {
-		return "", errors.New(fmt.Sprintf("Setting connection deadline: %+v", err))
+		return &IcmpReply{}, errors.New(fmt.Sprintf("Setting connection deadline: %+v", err))
 	}
 
 	message := icmp.Message{
 		Type: icmp_type , Code: 0,
 		Body: &icmp.Echo{
 			ID: os.Getpid() & 0xffff, Seq: 1,
-			Data: []byte("ICMP echo request"),
+			Data: []byte("mping request body"),
 		},
 	}
 
 	wb, err := message.Marshal(nil)
 	if err != nil {
-		return "", errors.New(fmt.Sprintf("Marshalling Message: %+v", err))
+		return &IcmpReply{}, errors.New(fmt.Sprintf("Marshalling Message: %+v", err))
 	}
 	
+	start := time.Now()
 	if _, err := conn.WriteTo(wb, &net.UDPAddr{IP: net.ParseIP(addr), Zone: ""}); err != nil {
-		return "", errors.New(fmt.Sprintf("Writing to conn: %+v", err))
+		return &IcmpReply{}, errors.New(fmt.Sprintf("Writing to conn: %+v", err))
 	}
 
 	rb := make([]byte, 1500)
 	n, peer, err := conn.ReadFrom(rb)
 	if err != nil {
-		return "", errors.New(fmt.Sprintf("Reading from conn: %+v", err))
+		return &IcmpReply{}, errors.New(fmt.Sprintf("Reading from conn: %+v", err))
 	}
+
+	duration := time.Since(start)
 
 	// recv_proto:
 	// icmpv4 proto number -> 0x01 -> 1
@@ -126,16 +138,11 @@ func Ping(addr string) (string, error) {
 	// e.q: rm, err := icmp.ParseMessage(58, rb[:n])
 	rm, err := icmp.ParseMessage(recv_proto, rb[:n])
 	if err != nil {
-		return "", errors.New(fmt.Sprintf("parsing message: %+v", err))
+		return &IcmpReply{}, errors.New(fmt.Sprintf("parsing message: %+v", err))
 	}
 
-	switch rm.Type {
-		case ipv4.ICMPTypeEchoReply:
-			return fmt.Sprintf("Reply %v - Type: %d - Checksum: %d - Message: %v ", peer, rm.Type, rm.Checksum, rm), nil
-		case ipv6.ICMPTypeEchoReply:
-			return fmt.Sprintf("Reply %v - Type: %d - Checksum: %d - Message: %v ", peer, rm.Type, rm.Checksum, rm), nil
-		default:
-			return fmt.Sprintf("Non-Reply: %v - Type: %d - Checksum: %d - Raw: %v", peer, rm.Type, rm.Checksum, rm), nil
-	}
+	return &IcmpReply{
+		Peer: peer, Type: rm.Type, Checksum: rm.Checksum,
+		Body: rm.Body, IcmpProto: recv_proto, Duration: duration,
+	}, nil
 }
-
