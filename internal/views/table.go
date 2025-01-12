@@ -1,36 +1,19 @@
 package views
 
 import (
-	"fmt"
-
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
-
-	"github.com/nevious/mping/internal/pinger"
 	"github.com/nevious/mping/internal/utils"
+	"github.com/nevious/mping/internal/objects"
 )
 
 
 // General rootModel for bubbletea to interact with
 type rootModel struct {
 	table *table.Table
-	records []dataRecord
+	records []objects.DataRecord
 }
-
-
-// Model for a single row within the table.
-// added to bubbletea rootModel via records-array
-type dataRecord struct {
-	Address string
-	Sent int
-	Failures int
-	Loss float64
-	PingReturn pinger.IcmpReply
-	LastMessage string
-	FailState lipgloss.Style
-}
-
 
 // initialize the rootModel with a tick
 func (m rootModel) Init() tea.Cmd {
@@ -86,60 +69,16 @@ func (m rootModel) updateRecords() rootModel {
 	var rows [][]string
 
 	for index, element := range m.records {
-		m.records[index] = element.refresh()
-		rows = append(rows, element.render())
+		m.records[index] = element.Refresh()
+		rows = append(rows, element.Render())
 	}
 	m.table.ClearRows()
 	m.table.Rows(rows...)
 
 	return m
 }
-
-// refresh a single dataRecord within m.records
-func (d dataRecord) refresh() dataRecord {
-	answer, err := pinger.SendICMPEcho(d.Address, 64)
-	if err != nil {
-		d.PingReturn = *answer
-		d.LastMessage = fmt.Sprintf("%+v", err)
-		d.Failures = d.Failures + 1
-		d.FailState = d.FailState.Foreground(lipgloss.Color("#F18C8E"))
-	} else {
-		d.PingReturn = *answer
-		d.LastMessage = fmt.Sprintf(
-			"Peer: %v - Checksum: %d - Proto: %d - Duration: %v",
-			answer.Peer, answer.Checksum, answer.IcmpProto, answer.Duration,
-		)
-		d.FailState = d.FailState.Foreground(lipgloss.Color("#4CAEA3"))
-	}
-
-	d.Sent = d.Sent + 1
-	d.Loss = float64(d.Failures)/float64(d.Sent)*100.0
-	return d
-}
-
-func (d dataRecord) render() []string {
-	return []string{
-		d.Address,
-		fmt.Sprintf("%d", d.Sent),
-		fmt.Sprintf("%d", d.Failures),
-		fmt.Sprintf("%2.3f%%", d.Loss),
-		fmt.Sprintf(d.FailState.Render("⚫")),
-		d.LastMessage,
-	}
-}
-
-
-func makeTableRows(addrs []string) []dataRecord {
-	var result []dataRecord
-	for _, element := range addrs {
-		result = append(result, dataRecord{element, 0, 0.0, 0, pinger.IcmpReply{}, "-", lipgloss.NewStyle()})
-	}
-
-	return result
-}
-
 func MakeTable(records []string) rootModel {
-	rows := makeTableRows(records)
+	rows := objects.MakeTableRows(records)
 	s := table.New().Border(
 			lipgloss.NormalBorder(),
 		).BorderStyle(

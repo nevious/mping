@@ -12,6 +12,7 @@ var (
 		lipgloss.Color("#FFFEEE"),
 	)
 	headerStyle = baseStyle.Bold(true).Width(5)
+	textStyle = lipgloss.NewStyle().MarginLeft(2).MarginRight(2).MarginTop(1)
 
 	// views
 	helpView helpModel
@@ -19,6 +20,4 @@ var (
 
 	// table index
 	record_index int = 1
-
-	textStyle = lipgloss.NewStyle().MarginLeft(2).MarginRight(2).MarginTop(1)
 )

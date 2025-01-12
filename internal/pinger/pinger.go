@@ -10,6 +10,8 @@ import (
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
+
+	"github.com/nevious/mping/internal/utils"
 )
 
 var (
@@ -19,14 +21,6 @@ var (
 	icmp_type icmp.Type
 )
 
-type IcmpReply struct {
-	Peer net.Addr
-	Type icmp.Type
-	Checksum int
-	Body icmp.MessageBody
-	IcmpProto int
-	Duration time.Duration
-}
 
 func lookupAddress(s string) ([]net.IP, error) {
 	result, err := net.LookupIP(s)
@@ -51,7 +45,7 @@ func determineAddressFamily(s string) (ip_version) {
 	}
 }
 
-func SendICMPEcho(addr string, ttl int) (*IcmpReply, error) {
+func SendICMPEcho(addr string, ttl int) (*utils.IcmpReply, error) {
 	var (
 		network string
 		l_addr string
@@ -71,7 +65,7 @@ func SendICMPEcho(addr string, ttl int) (*IcmpReply, error) {
 			// do we even wanna do lookups here?
 			// might be better outside of this function
 			if result, err := net.ResolveIPAddr("ip4", addr); err != nil {
-				return &IcmpReply{}, errors.New(fmt.Sprintf("lookup error %v: %v", addr, err))
+				return &utils.IcmpReply{}, errors.New(fmt.Sprintf("lookup error %v: %v", addr, err))
 			} else {
 				remote_addr = *result
 			}
@@ -80,13 +74,13 @@ func SendICMPEcho(addr string, ttl int) (*IcmpReply, error) {
 
 	conn, err := icmp.ListenPacket(network, l_addr)
 	if err != nil {
-		return &IcmpReply{}, errors.New(fmt.Sprintf("icmp.ListenPacket: %+v", err))
+		return &utils.IcmpReply{}, errors.New(fmt.Sprintf("icmp.ListenPacket: %+v", err))
 	}
 	defer conn.Close()
 
 	err = conn.SetDeadline(time.Now().Add(time.Millisecond*500))
 	if err != nil {
-		return &IcmpReply{}, errors.New(fmt.Sprintf("Setting connection deadline: %+v", err))
+		return &utils.IcmpReply{}, errors.New(fmt.Sprintf("Setting connection deadline: %+v", err))
 	}
 
 	switch icmp_type {
@@ -97,7 +91,7 @@ func SendICMPEcho(addr string, ttl int) (*IcmpReply, error) {
 	}
 
 	if err != nil {
-		return &IcmpReply{}, errors.New(fmt.Sprintf("Setting TTL: %+v", err))
+		return &utils.IcmpReply{}, errors.New(fmt.Sprintf("Setting TTL: %+v", err))
 	}
 
 	message := icmp.Message{
@@ -110,19 +104,19 @@ func SendICMPEcho(addr string, ttl int) (*IcmpReply, error) {
 
 	msg, err := message.Marshal(nil)
 	if err != nil {
-		return &IcmpReply{}, errors.New(fmt.Sprintf("Marshalling Message: %+v", err))
+		return &utils.IcmpReply{}, errors.New(fmt.Sprintf("Marshalling Message: %+v", err))
 	}
 	
 	start := time.Now()
 	//if _, err := conn.WriteTo(msg, &net.UDPAddr{IP: net.ParseIP(addr), Zone: ""}); err != nil {
 	if _, err := conn.WriteTo(msg, &remote_addr); err != nil {
-		return &IcmpReply{}, errors.New(fmt.Sprintf("Writing to conn: %+v", err))
+		return &utils.IcmpReply{}, errors.New(fmt.Sprintf("Writing to conn: %+v", err))
 	}
 
 	read_buff := make([]byte, 1500)
 	n_bytes, peer, err := conn.ReadFrom(read_buff)
 	if err != nil {
-		return &IcmpReply{}, errors.New(fmt.Sprintf("Reading from conn: Err:%+v", err))
+		return &utils.IcmpReply{}, errors.New(fmt.Sprintf("Reading from conn: Err:%+v", err))
 	}
 
 	duration := time.Since(start)
@@ -133,10 +127,10 @@ func SendICMPEcho(addr string, ttl int) (*IcmpReply, error) {
 	// e.q: rm, err := icmp.ParseMessage(58, rb[:n])
 	rm, err := icmp.ParseMessage(recv_proto, read_buff[:n_bytes])
 	if err != nil {
-		return &IcmpReply{}, errors.New(fmt.Sprintf("parsing message: %+v", err))
+		return &utils.IcmpReply{}, errors.New(fmt.Sprintf("parsing message: %+v", err))
 	}
 
-	return &IcmpReply{
+	return &utils.IcmpReply{
 		Peer: peer, Type: rm.Type, Checksum: rm.Checksum,
 		Body: rm.Body, IcmpProto: recv_proto, Duration: duration,
 	}, nil

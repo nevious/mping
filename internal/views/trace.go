@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/nevious/mping/internal/utils"
 	"github.com/nevious/mping/internal/pinger"
+	"github.com/nevious/mping/internal/objects"
 )
 
 type traceModel struct {
@@ -92,7 +93,7 @@ func (t traceModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 						x = append(x, element.Address)
 					}
-					records := makeTableRows(x)
+					records := objects.MakeTableRows(x)
 					t.rootModel.records = records
 					return *t.rootModel, nil
 				case "esc":
