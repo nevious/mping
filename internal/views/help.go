@@ -2,7 +2,6 @@ package views
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 
 	"github.com/nevious/mping/internal/utils"
 )
@@ -24,17 +23,13 @@ Main options
 	--help				Show usage and exit
 `
 
-var (
-	helpStyle = lipgloss.NewStyle().MarginLeft(2).MarginRight(2).MarginTop(1)
-)
-
 type helpModel struct {
 	text string
 	rootModel *rootModel
 }
 
 func (o helpModel) View() string {
-	return helpStyle.Render(o.text)
+	return textStyle.Render(o.text)
 }
 
 func (o helpModel) Init() tea.Cmd { return nil }

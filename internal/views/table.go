@@ -36,6 +36,7 @@ type dataRecord struct {
 func (m rootModel) Init() tea.Cmd {
 	helpView = *NewHelp(&m)
 	traceView = *NewTrace(&m)
+
 	return utils.SecondTick()
 }
 
@@ -51,7 +52,7 @@ func(m rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd){
 				case "q", "ctrl+c":
 					return m, tea.Quit
 				case "?":
-					return helpView, utils.SecondTick()
+					return helpView, nil
 				case "j":
 					if record_index == len(m.records) -1 {
 						record_index = 0
@@ -67,7 +68,8 @@ func(m rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd){
 					}
 					return m, nil
 				case "t":
-					return traceView, utils.SecondTick()
+					traceView.SetDestination(m.records[record_index].Address)
+					return traceView, nil
 			}
 	}
 
