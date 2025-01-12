@@ -3,10 +3,8 @@ package pinger
 import (
 	"errors"
 	"fmt"
-	"log/slog"
 	"net"
 	"os"
-	"runtime"
 	"time"
 
 	"golang.org/x/net/icmp"
@@ -53,46 +51,31 @@ func determineAddressFamily(s string) (ip_version) {
 	}
 }
 
-func Ping(addr string) (*IcmpReply, error) {
-	switch runtime.GOOS {
-		case "darwin", "ios":
-		case "linux":
-			slog.Debug("you may need to adjust the net.ipv4.ping_group_range kernel state")
-		default:
-			return &IcmpReply{}, errors.New("Unsupported Operating system")
-	}
+func SendICMPEcho(addr string, ttl int) (*IcmpReply, error) {
+	var (
+		network string
+		l_addr string
+		recv_proto int
+		icmp_type icmp.Type
+		remote_addr net.IPAddr
+	)
 
 	switch {
 		case determineAddressFamily(addr) == 4:
-			network, l_addr, recv_proto, icmp_type = "udp4", "0.0.0.0", 1, ipv4.ICMPTypeEcho
+			network, l_addr, recv_proto, icmp_type = "ip4:icmp", "0.0.0.0", 1, ipv4.ICMPTypeEcho
+			remote_addr = net.IPAddr{IP: net.ParseIP(addr)}
 		case determineAddressFamily(addr) == 6:
-			network, l_addr, recv_proto, icmp_type = "udp6", "::", 58, ipv6.ICMPTypeEchoRequest
+			network, l_addr, recv_proto, icmp_type = "ip6:ipv6-icmp", "::", 58, ipv6.ICMPTypeEchoRequest
+			remote_addr = net.IPAddr{IP: net.ParseIP(addr)}
 		default:
-			// most likely a hostname.. let's first try to look it up and then figure out the rest
-			addr_slice, err := lookupAddress(addr)
-			if err != nil {
+			// do we even wanna do lookups here?
+			// might be better outside of this function
+			if result, err := net.ResolveIPAddr("ip4", addr); err != nil {
 				return &IcmpReply{}, errors.New(fmt.Sprintf("lookup error %v: %v", addr, err))
+			} else {
+				remote_addr = *result
 			}
-			new_addr := addr_slice[0].String()
-
-			if determineAddressFamily(new_addr) == 4 {
-				network, l_addr, recv_proto, icmp_type = "udp4", "0.0.0.0", 1, ipv4.ICMPTypeEcho
-			} else if determineAddressFamily(new_addr) == 6 {
-				network, l_addr, recv_proto, icmp_type = "udp6", "::", 58, ipv6.ICMPTypeEchoRequest
-			}
-
-			// Keeping it here just in case...
-			slog.Debug(
-				fmt.Sprintf("default mapping performend on %v", addr),
-				slog.String("network", network),
-				slog.String("l_addr", l_addr),
-				slog.Int("recv_proto", recv_proto),
-				slog.String("icmp_type", fmt.Sprintf("%d", icmp_type)),
-				slog.String("name lookup", fmt.Sprintf("%v", addr_slice)),
-				slog.String("new addr", new_addr),
-			)
-
-			addr = new_addr
+			network, l_addr, recv_proto, icmp_type = "ip4:icmp", "0.0.0.0", 1, ipv4.ICMPTypeEcho
 	}
 
 	conn, err := icmp.ListenPacket(network, l_addr)
@@ -106,6 +89,17 @@ func Ping(addr string) (*IcmpReply, error) {
 		return &IcmpReply{}, errors.New(fmt.Sprintf("Setting connection deadline: %+v", err))
 	}
 
+	switch icmp_type {
+		case ipv4.ICMPTypeEcho:
+			err = conn.IPv4PacketConn().SetTTL(ttl)
+		case ipv6.ICMPTypeEchoRequest:
+			err = conn.IPv6PacketConn().SetHopLimit(ttl)
+	}
+
+	if err != nil {
+		return &IcmpReply{}, errors.New(fmt.Sprintf("Setting TTL: %+v", err))
+	}
+
 	message := icmp.Message{
 		Type: icmp_type , Code: 0,
 		Body: &icmp.Echo{
@@ -114,20 +108,21 @@ func Ping(addr string) (*IcmpReply, error) {
 		},
 	}
 
-	wb, err := message.Marshal(nil)
+	msg, err := message.Marshal(nil)
 	if err != nil {
 		return &IcmpReply{}, errors.New(fmt.Sprintf("Marshalling Message: %+v", err))
 	}
 	
 	start := time.Now()
-	if _, err := conn.WriteTo(wb, &net.UDPAddr{IP: net.ParseIP(addr), Zone: ""}); err != nil {
+	//if _, err := conn.WriteTo(msg, &net.UDPAddr{IP: net.ParseIP(addr), Zone: ""}); err != nil {
+	if _, err := conn.WriteTo(msg, &remote_addr); err != nil {
 		return &IcmpReply{}, errors.New(fmt.Sprintf("Writing to conn: %+v", err))
 	}
 
-	rb := make([]byte, 1500)
-	n, peer, err := conn.ReadFrom(rb)
+	read_buff := make([]byte, 1500)
+	n_bytes, peer, err := conn.ReadFrom(read_buff)
 	if err != nil {
-		return &IcmpReply{}, errors.New(fmt.Sprintf("Reading from conn: %+v", err))
+		return &IcmpReply{}, errors.New(fmt.Sprintf("Reading from conn: Err:%+v", err))
 	}
 
 	duration := time.Since(start)
@@ -136,7 +131,7 @@ func Ping(addr string) (*IcmpReply, error) {
 	// icmpv4 proto number -> 0x01 -> 1
 	// icmpv6 proto number -> 0x3a -> 58
 	// e.q: rm, err := icmp.ParseMessage(58, rb[:n])
-	rm, err := icmp.ParseMessage(recv_proto, rb[:n])
+	rm, err := icmp.ParseMessage(recv_proto, read_buff[:n_bytes])
 	if err != nil {
 		return &IcmpReply{}, errors.New(fmt.Sprintf("parsing message: %+v", err))
 	}

@@ -1,30 +1,23 @@
-package table
+package views
 
 import (
-	"time"
 	"fmt"
-	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
 
 	"github.com/nevious/mping/internal/pinger"
+	"github.com/nevious/mping/internal/utils"
 )
 
-var (
-	renderer = lipgloss.NewRenderer(os.Stdout)
-	baseStyle = renderer.NewStyle().Padding(0, 1).Foreground(
-		lipgloss.Color("#FFFEEE"),
-	)
-	headerStyle = baseStyle.Bold(true).Width(5)
-)
 
 // General rootModel for bubbletea to interact with
 type rootModel struct {
 	table *table.Table
 	records []dataRecord
 }
+
 
 // Model for a single row within the table.
 // added to bubbletea rootModel via records-array
@@ -38,30 +31,43 @@ type dataRecord struct {
 	FailState lipgloss.Style
 }
 
-// basically emit a tea command every time.Second
-type tickMsg time.Time
-func tick() tea.Cmd {
-	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
-		return tickMsg(t)
-	})
-}
 
 // initialize the rootModel with a tick
 func (m rootModel) Init() tea.Cmd {
-	return tick()
+	helpView = *NewHelp(&m)
+	traceView = *NewTrace(&m)
+	return utils.SecondTick()
 }
 
 // any sort of event shoudl trigger this method
 func(m rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd){
 	switch msg := msg.(type) {
-		case tickMsg:
-			return m.updateRecords(), tick()
+		case utils.SecondTickMsg:
+			return m.updateRecords(), utils.SecondTick()
 		case tea.WindowSizeMsg:
 			m.table = m.table.Width(msg.Width)
 		case tea.KeyMsg:
 			switch msg.String() {
 				case "q", "ctrl+c":
 					return m, tea.Quit
+				case "?":
+					return helpView, utils.SecondTick()
+				case "j":
+					if record_index == len(m.records) -1 {
+						record_index = 0
+					} else {
+						record_index = record_index+1
+					}
+					return m, nil
+				case "k":
+					if record_index == 0 {
+						record_index = len(m.records) - 1
+					} else {
+						record_index = record_index-1
+					}
+					return m, nil
+				case "t":
+					return traceView, utils.SecondTick()
 			}
 	}
 
@@ -89,7 +95,7 @@ func (m rootModel) updateRecords() rootModel {
 
 // refresh a single dataRecord within m.records
 func (d dataRecord) refresh() dataRecord {
-	answer, err := pinger.Ping(d.Address)
+	answer, err := pinger.SendICMPEcho(d.Address, 64)
 	if err != nil {
 		d.PingReturn = *answer
 		d.LastMessage = fmt.Sprintf("%+v", err)
@@ -156,6 +162,10 @@ func MakeTable(records []string) rootModel {
 					style = headerStyle.Width(200)
 				case col == 4:
 					style = style.AlignHorizontal(lipgloss.Center)
+			}
+
+			if row == record_index {
+				style = style.Foreground(lipgloss.Color("#111111")).Background(lipgloss.Color("#2196f3"))
 			}
 
 			return style

@@ -7,14 +7,13 @@ import (
 	"strings"
 )
 
-type hosts []string
-
 var (
 	help bool
 	version bool
 	addrFlag hosts
 )
 
+type hosts []string
 
 func (h *hosts) String() string {
 	return fmt.Sprint(*h)

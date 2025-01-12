@@ -42,7 +42,7 @@ var ping_addresses = []input{
 
 func TestPingDestination(t *testing.T) {
 	for _, test := range ping_addresses {
-		result, err := Ping(test.addr)
+		result, err := SendICMPEcho(test.addr, 64)
 		if err != nil {
 			t.Errorf("threw error, unexpected: %+v", err)
 		}
@@ -50,6 +50,7 @@ func TestPingDestination(t *testing.T) {
 		fmt.Printf("Pinging result: %+v\n", result)
 	}
 }
+
 
 type string_input struct {
 	addr string
@@ -81,3 +82,47 @@ func TestLookupAddress(t *testing.T) {
 	}
 }
 
+type tracetest struct {
+	addr string
+	hops int
+}
+var trace_addrs = []tracetest {
+	{"8.8.8.8", 9},
+	{"192.168.50.1", 1},
+}
+
+func TestTrace(t *testing.T) {
+	for _, destination := range trace_addrs{
+		t.Logf("Tracing %v expecting %d hops\n", destination.addr, destination.hops)
+		seen_hops := 0
+		ttl := 1
+		seen_destination := false
+
+		for {
+			if seen_destination == true {
+				break
+			}
+
+			if seen_hops > destination.hops {
+				t.Fatalf("Exceeded excepted hops: %v", destination.addr)
+			}
+			
+			result, err := SendICMPEcho(destination.addr, ttl)
+			if err != nil {
+				t.Logf("unable to walk to %v: %v Result: %v", destination, err, result)
+			} else if result.Peer.String() == destination.addr {
+				seen_destination = true
+			}
+
+			seen_hops = seen_hops+1
+			ttl = ttl+1
+		}
+		
+		if seen_destination && seen_hops == destination.hops{
+			t.Logf("Seen destination within %d hops", destination.hops)
+		} else {
+			t.Fail()
+			t.Errorf("Test failed. expected: %d, seen: %d", destination.hops, seen_hops)
+		}
+	}
+}
