@@ -28,7 +28,8 @@ func (t *traceModel) runTrace() traceModel {
 	}
 	destination, err := net.ResolveIPAddr("ip4", t.dst)
 	if err != nil {
-		panic("Unable to resolve address")
+		t.hops = append(t.hops, hopRecord{Address: "Lookup failed"})
+		return *t
 	}
 
 	for ttl := 1; ttl < 32 ; ttl++ {
