@@ -1,6 +1,10 @@
 package views
 
 import (
+	"fmt"
+	"time"
+	"os/user"
+	"os"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
@@ -8,6 +12,9 @@ import (
 	"github.com/nevious/mping/internal/objects"
 )
 
+var record_index int = 1
+var helpView *helpModel
+var traceView *traceModel
 
 // General rootModel for bubbletea to interact with
 type rootModel struct {
@@ -17,8 +24,8 @@ type rootModel struct {
 
 // initialize the rootModel with a tick
 func (m rootModel) Init() tea.Cmd {
-	helpView = *NewHelp(&m)
-	traceView = *NewTrace(&m)
+	helpView = NewHelp(&m)
+	traceView = NewTrace(&m)
 
 	return utils.SecondTick()
 }
@@ -60,23 +67,46 @@ func(m rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd){
 }
 
 func(m rootModel) View() string {
-	return m.table.String()
+	username, err := user.Current()
+	if err != nil {
+		username = &user.User{}
+	}
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = "unknown"
+	}
+	
+	v_header := timestampStyle.Render(
+		fmt.Sprintf(
+			"%s@%s\t%v\tPID: %d", username.Username, hostname,
+			time.Now().Format(time.RFC850), os.Getpid(),
+		),
+	)
+	
+	output := fmt.Sprintf("%v\n%v", v_header, m.table.String())
+	return output
 }
 
-// triggered by Update() if the tick ran out
+// called by Update() if the tick ran out
 // replace rows with new values
-func (m rootModel) updateRecords() rootModel {
+func (m *rootModel) updateRecords() *rootModel {
+	// [row][cells] - if that makes sense
 	var rows [][]string
 
 	for index, element := range m.records {
-		m.records[index] = element.Refresh()
-		rows = append(rows, element.Render())
+		m.records[index] = *element.Refresh()
+		// Rows must be []string or for the lipgloss.table
+		// object to be able to handle it. Therefore the replace logic
+		rows = append(rows, m.records[index].Render())
 	}
+
 	m.table.ClearRows()
 	m.table.Rows(rows...)
 
 	return m
 }
+
 func MakeTable(records []string) rootModel {
 	rows := objects.MakeTableRows(records)
 	s := table.New().Border(
@@ -84,29 +114,16 @@ func MakeTable(records []string) rootModel {
 		).BorderStyle(
 			renderer.NewStyle().Foreground(lipgloss.Color("#2196F3")),
 		).Headers(
-			"Address", "Total", "Failed", "%-Loss", "Up", "Last Message",
+			"Address", "Total", "Failed", "Up", "Last Message",
+			"%-Loss", "Last", "Max", "Min", "Avg", "StD",
 		).StyleFunc(func(row, col int) lipgloss.Style {
 			var style = baseStyle
 
 			switch {
-				case col == 0 && row == -1:
-					style = headerStyle
-				case col == 1 && row == -1:
-					style = headerStyle
-				case col == 2 && row == -1:
-					style = headerStyle
-				case col == 3 && row == -1:
-					style = headerStyle
 				case col == 4 && row == -1:
-					style = headerStyle.Width(5).AlignHorizontal(lipgloss.Center)
-				case col == 5 && row == -1:
-					style = headerStyle.Width(200)
-				case col == 4:
-					style = style.AlignHorizontal(lipgloss.Center)
-			}
-
-			if row == record_index {
-				style = style.Foreground(lipgloss.Color("#111111")).Background(lipgloss.Color("#2196f3"))
+					style = baseStyle.Width(200)
+				case row == record_index:
+					style = highlightStyle
 			}
 
 			return style

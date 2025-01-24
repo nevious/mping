@@ -95,9 +95,9 @@ func (t traceModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					records := objects.MakeTableRows(x)
 					t.rootModel.records = records
-					return *t.rootModel, nil
+					return t.rootModel, nil
 				case "esc":
-					return *t.rootModel, nil
+					return t.rootModel, nil
 			}
 		case utils.SecondTickMsg:
 			return t.runTrace(), utils.SecondTick()

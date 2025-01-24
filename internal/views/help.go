@@ -41,7 +41,7 @@ func (o helpModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case "q":
 					return o, tea.Quit
 				case "esc":
-					return *o.rootModel, utils.SecondTick()
+					return o.rootModel, utils.SecondTick()
 			}
 	}
 	return o, nil

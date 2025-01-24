@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	records := parser.Parse()
+	dests := parser.Parse()
 
 	// unpriv ping socket don't work for me, even with set ping_group_range
 	switch runtime.GOOS {
@@ -18,7 +18,7 @@ func main() {
 			slog.Info("you may need to adjust the net.ipv4.ping_group_range kernel state")
 	}
 
-	if _, err := views.LaunchTablePing(views.MakeTable(records)); err != nil {
+	if _, err := views.LaunchTablePing(views.MakeTable(dests)); err != nil {
 		slog.Error(
 			"Unable to run programm",
 			slog.String("Error:", fmt.Sprintf("%v", err)),
