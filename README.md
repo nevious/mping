@@ -18,7 +18,29 @@ Usage of mping:
     	Show version number and exit
 ```
 
-Starting and then presing `?` will yield some more specific information.
+Starting and then presing `?` will yield some more specific information:
+
+```
+  Mping Help
+  ============================================
+
+  Root View:
+      q: Quit                ?: Show this Help
+
+  Help View:
+      q: Quit                <esc> : Return to Root View
+
+  Trace View:
+      q: Quit
+      r: Refresh the trace
+      R: Replace the rows in the main view traces
+      <esc> : Return to Root View
+
+  Main options
+      -a [addr,...]        List of addresses to ping
+      --version             Show Version and exit
+      --help                Show usage and exit
+```
 
 # Installation
 
