@@ -16,6 +16,11 @@ Root View:
 Help View:
 	q: Quit				<esc> : Return to Root View
 
+Trace View:
+	q: Quit				
+	r: Refresh the trace
+	R: Replace the rows in the main view traces
+	<esc> : Return to Root View
 
 Main options
 	-a [addr,...]		List of addresses to ping

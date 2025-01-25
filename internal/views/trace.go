@@ -16,6 +16,7 @@ type traceModel struct {
 	hops []hopRecord
 	rootModel *rootModel
 	dst string
+	help *helpModel
 }
 
 type hopRecord struct {
@@ -96,6 +97,8 @@ func (t traceModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					records := objects.MakeTableRows(x)
 					t.rootModel.records = records
 					return t.rootModel, nil
+				case "?":
+					return t.help, nil
 				case "esc":
 					return t.rootModel, nil
 			}
@@ -106,6 +109,6 @@ func (t traceModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return t, nil
 }
 
-func NewTrace(r *rootModel) *traceModel {
-	return &traceModel{rootModel: r}
+func NewTrace(r *rootModel, h *helpModel) *traceModel {
+	return &traceModel{rootModel: r, help: h}
 }

@@ -1,6 +1,6 @@
 module github.com/nevious/mping
 
-go 1.23.2
+go 1.21.13
 
 require (
 	github.com/charmbracelet/bubbletea v1.2.4

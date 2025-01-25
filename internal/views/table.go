@@ -25,7 +25,7 @@ type rootModel struct {
 // initialize the rootModel with a tick
 func (m rootModel) Init() tea.Cmd {
 	helpView = NewHelp(&m)
-	traceView = NewTrace(&m)
+	traceView = NewTrace(&m, helpView)
 
 	return utils.SecondTick()
 }
